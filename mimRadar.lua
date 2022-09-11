@@ -19,7 +19,7 @@ local cfg, im_cfg = {
     show = false,
     width = 450,
     height = 250,
-    scale = 0.08,
+    scale = 0.1,
     iconSize = 15.0,
 }, {
     map_texture = nil,
@@ -35,7 +35,47 @@ function main()
     cfg = readJson(configPath, cfg)
 
     sampRegisterChatCommand('radar', showRadar)
+    sampRegisterChatCommand('setwidth', changeWidth)
+    sampRegisterChatCommand('setheight', changeHeight)
+    sampRegisterChatCommand('setscale', changeScale)
+    sampRegisterChatCommand('resrtcfg', resetCfg)
     wait(-1)
+end
+
+function resetCfg()
+    writeJson(configPath, 
+    {
+        mapFileName = "map2048.png",
+        show = false,
+        width = 450,
+        height = 250,
+        scale = 0.1,
+        iconSize = 15.0,
+    })
+end
+
+function changeWidth(args)
+    args = tonumber(args)
+    if args ~= nil and args > 0 then
+        cfg.width = args
+        writeJson(configPath, cfg)
+    end
+end
+
+function changeScale(args)
+    args = tonumber(args)
+    if args ~= nil and args > 0.0 and args < 1.0 then
+        cfg.scale = args
+        writeJson(configPath, cfg)
+    end
+end
+
+function changeHeight(args)
+    args = tonumber(args)
+    if args ~= nil and args > 0 then
+        cfg.height = args
+        writeJson(configPath, cfg)
+    end
 end
 
 im.OnFrame(function() return cfg.show and isCanRadarRender() end,
@@ -121,9 +161,10 @@ function renderLockedRadar(center, size, scale, map, rounding)
         for k, v in pairs(im_cfg.map_icons) do
             local gl = transform3Dto2D(vec2(v.position.x, v.position.y))
             local res, px, py = getPointInRect(0, 0, size.x, size.y, gl.x, gl.y)
-            
+            local sz = minIconSize * 1
+
             if not res then
-                dw:AddImage(v.texture, vec2(screenPos.x + px - 15, screenPos.y + py - 15), vec2(screenPos.x + px + 15, screenPos.y + py + 15), vec2(0, 0), vec2(1, 1), 0xFFFFFFFF)
+                dw:AddImage(v.texture, vec2(screenPos.x + px - sz, screenPos.y + py - sz), vec2(screenPos.x + px + sz, screenPos.y + py + sz), vec2(0, 0), vec2(1, 1), 0xFFFFFFFF)
             end
         end
     end
