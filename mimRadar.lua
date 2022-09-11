@@ -38,7 +38,7 @@ function main()
     sampRegisterChatCommand('setwidth', changeWidth)
     sampRegisterChatCommand('setheight', changeHeight)
     sampRegisterChatCommand('setscale', changeScale)
-    sampRegisterChatCommand('resrtcfg', resetCfg)
+    sampRegisterChatCommand('resetcfg', resetCfg)
     wait(-1)
 end
 
