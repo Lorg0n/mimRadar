@@ -1,86 +1,64 @@
 script_name 'mimRadar'
 script_author 'GovnocodeLua'
-script_version '0.1'
+script_version '0.2'
 
 local im = require 'mimgui'
 local samp = require 'samp.events'
 local new = im.new
 local vec2, vec4 = im.ImVec2, im.ImVec4
 
--- COMMENTS
 -- 3D -> World Coordinates
 -- Global2D -> Coordinates On 6K MAP
 -- 2D -> Coordinates on Radar
 
-local cfg = {
-    show = true,
+local assetsPath = thisScript().directory .. "\\mimRadar\\"
+local configPath = assetsPath .. 'mimradar.json'
+
+local cfg, im_cfg = {
+    mapFileName = "map2048.png",
+    show = false,
+    width = 450,
+    height = 250,
+    scale = 0.08,
+    iconSize = 15.0,
+}, {
     map_texture = nil,
     marker_texture = nil,
     north_texture = nil,
     gang_zone = {},
     map_icons = {},
     players = {},
-    size = vec2(250, 250),
-    scale = 0.08,
-    path = getGameDirectory() .. '\\moonloader\\mimRadar\\',
 }
 
-function samp.onCreateGangZone(zoneId, squareStart, squareEnd, color) -- zoneId = 'int16'}, {squareStart = 'vector2d'}, {squareEnd = 'vector2d'}, {color = 'int32'}
-    cfg.gang_zone[zoneId] = {}
-    cfg.gang_zone[zoneId] = {
-        squareStart = squareStart,
-        squareEnd = squareEnd,
-        color = color,
-    }
-end
+function main()
+    while not isSampAvailable() do wait(0) end
+    cfg = readJson(configPath, cfg)
 
-function samp.onSetMapIcon(iconId, position, type, color, style) --{iconId = 'int8'}, {position = 'vector3d'}, {type = 'int8'}, {color = 'int32'}, {style = 'int8'}}
-    local path = cfg.path .. tostring(type) .. '.png'
-    if doesFileExist(path) then
-        cfg.map_icons[iconId] = {}
-        cfg.map_icons[iconId] = {
-            position = position,
-            type = type,
-            color = color,
-            style = style,
-            texture = im.CreateTextureFromFile(path),
-        }
-        print('created')
-    end
-end
-
-function samp.onGangZoneDestroy(zoneId)
-    if cfg.gang_zone[zoneId] ~= nil then
-        cfg.gang_zone[zoneId] = nil
-    end
-end
-
-function samp.onRemoveMapIcon(iconId)
-    if cfg.map_icons[iconId] ~= nil then
-        cfg.map_icons[iconId] = nil
-    end
+    sampRegisterChatCommand('radar', showRadar)
+    wait(-1)
 end
 
 im.OnFrame(function() return cfg.show and isCanRadarRender() end,
 function()
-    displayRadar(false)
     local flags = im.WindowFlags.NoDecoration + im.WindowFlags.AlwaysAutoResize + im.WindowFlags.NoBackground + im.WindowFlags.NoSavedSettings
     local sx, sy = getScreenResolution()
     local positionX, positionY, positionZ = getCharCoordinates(PLAYER_PED)
 
+    displayRadar(false)
+
     im.SetNextWindowPos(vec2(0, sy), im.Cond.FirstUseEver, vec2(0, 1))
     im.Begin('radar', nil, flags)
-    im.BeginChild('radarBorder', vec2(cfg.size.x * 1.2, cfg.size.y * 1.2), false)
-    im.SetCursorPos(vec2((cfg.size.x * 1.2 - cfg.size.x) * 0.5, (cfg.size.y * 1.2 - cfg.size.y) * 0.5))
-    renderLockedRadar(vec2(positionX, positionY), cfg.size, cfg.scale, cfg.map_texture, 20.0)
+    im.BeginChild('radarBorder', vec2(cfg.width * 1.2, cfg.height * 1.2), false)
+    im.SetCursorPos(vec2((cfg.width * 1.2 - cfg.width) * 0.5, (cfg.height * 1.2 - cfg.height) * 0.5))
+    renderLockedRadar(vec2(positionX, positionY), vec2(cfg.width, cfg.height), cfg.scale, im_cfg.map_texture, 20.0)
     im.EndChild()
     im.End()
 end).HideCursor = true
 
 im.OnInitialize(function()
-	cfg.map_texture = im.CreateTextureFromFile(cfg.path .. 'map2048.png')
-    cfg.marker_texture = im.CreateTextureFromFile(cfg.path .. 'marker.png')
-    cfg.north_texture = im.CreateTextureFromFile(cfg.path .. 'north.png')
+	im_cfg.map_texture = im.CreateTextureFromFile(assetsPath .. 'map2048.png')
+    im_cfg.marker_texture = im.CreateTextureFromFile(assetsPath .. 'marker.png')
+    im_cfg.north_texture = im.CreateTextureFromFile(assetsPath .. 'north.png')
 	im.GetIO().IniFilename = nil
 end)
 
@@ -88,7 +66,7 @@ function renderLockedRadar(center, size, scale, map, rounding)
     local cursorPos = im.GetCursorPos()
     local screenPos = im.GetCursorScreenPos()
     local ratio = size.x / size.y
-    local minIconSize = math.min(size.x, size.y) / 17.5
+    local minIconSize = math.min(size.x, size.y) / cfg.iconSize
     local strUniq = string.format('radar<%s; %s, %s>:', screenPos.x, screenPos.y, scale)
 
     im.BeginChild('##child' .. strUniq, size, nil)
@@ -140,7 +118,7 @@ function renderLockedRadar(center, size, scale, map, rounding)
         dw:AddCircleFilled(vec2(cen.x, cen.y), radius, colors.a, radius * 1.5)
     end
     local function drawMapIcon()
-        for k, v in pairs(cfg.map_icons) do
+        for k, v in pairs(im_cfg.map_icons) do
             local gl = transform3Dto2D(vec2(v.position.x, v.position.y))
             local res, px, py = getPointInRect(0, 0, size.x, size.y, gl.x, gl.y)
             
@@ -150,7 +128,7 @@ function renderLockedRadar(center, size, scale, map, rounding)
         end
     end
     local function drawGangZone()
-        for k, v in pairs(cfg.gang_zone) do
+        for k, v in pairs(im_cfg.gang_zone) do
             local glStart = transform3Dto2D(vec2(v.squareStart.x, v.squareStart.y))
             local glEnd = transform3Dto2D(vec2(v.squareEnd.x, v.squareEnd.y))
             local resStart, xstart, ystart = getPointInRect(0, 0, size.x, size.y, glStart.x, glStart.y)
@@ -182,13 +160,13 @@ function renderLockedRadar(center, size, scale, map, rounding)
     local function drawGlobalIcon()
         local sz = minIconSize * 1.0
         local res, px, py = getPointInRect(0, 0, size.x, size.y, size.x / 2, 0)
-        dw:AddImage(cfg.north_texture, vec2(screenPos.x + px - sz, screenPos.y + py - sz), vec2(screenPos.x + px + sz, screenPos.y + py + sz), vec2(0, 0), vec2(1, 1), 0xFFFFFFFF)
+        dw:AddImage(im_cfg.north_texture, vec2(screenPos.x + px - sz, screenPos.y + py - sz), vec2(screenPos.x + px + sz, screenPos.y + py + sz), vec2(0, 0), vec2(1, 1), 0xFFFFFFFF)
         
         local result, posX, posY, posZ = getTargetBlipCoordinates()
         if result then
             local gl = transform3Dto2D(vec2(posX, posY))
             local res, px, py = getPointInRect(0, 0, size.x, size.y, gl.x, gl.y)
-            dw:AddImage(cfg.marker_texture, vec2(screenPos.x + px - sz, screenPos.y + py - sz), vec2(screenPos.x + px + sz, screenPos.y + py + sz), vec2(0, 0), vec2(1, 1), 0xFFFFFFFF)
+            dw:AddImage(im_cfg.marker_texture, vec2(screenPos.x + px - sz, screenPos.y + py - sz), vec2(screenPos.x + px + sz, screenPos.y + py + sz), vec2(0, 0), vec2(1, 1), 0xFFFFFFFF)
         end
     end
 
@@ -202,9 +180,35 @@ function renderLockedRadar(center, size, scale, map, rounding)
     drawGlobalIcon()
 end
 
-function main()
-    while not isSampAvailable() do wait(0) end
-    sampRegisterChatCommand('radar', function() cfg.show = not cfg.show end)
+function showRadar()
+    cfg.show = not cfg.show 
+    writeJson(configPath, cfg)
+end
+
+-- @Musaigen
+function readJson(path, def)
+	if doesFileExist(path) then
+		local f = io.open(path, 'r+')
+		local data = decodeJson(f:read('*a'))
+		f:close()
+        print('Configuration loaded')
+		return data
+	else
+        print('Default configuration is loaded')
+        writeJson(path, cfg)
+		return def
+	end
+end
+
+function writeJson(path, data) 
+	if type(data) ~= 'table' then
+		return
+	end
+	local f = io.open(path, 'w')
+	local writing_data = encodeJson(data)
+	f:write(writing_data)
+	f:close()
+    print('Configuration saved')
 end
 
 function getPointInRect(x1, y1, x2, y2, px, py) -- upper, bottom, point
@@ -230,6 +234,11 @@ function rotatePoint(p, c, angle)
     return vec2(x, y)
 end
 
+function isCanRadarRender()
+    local res = isSampAvailable() and not isGamePaused() and isSampLoaded()
+    return res
+end
+
 function getAdaptiveHeading()
     if isCharInAnyCar(PLAYER_PED) then
         return getHeading()
@@ -250,15 +259,37 @@ function getHeading()
     return getCharHeading(PLAYER_PED)
 end
 
-function explode_argb(argb)
-    local a = bit.band(bit.rshift(argb, 24), 0xFF)
-    local r = bit.band(bit.rshift(argb, 16), 0xFF)
-    local g = bit.band(bit.rshift(argb, 8), 0xFF)
-    local b = bit.band(argb, 0xFF)
-    return a, r, g, b
+function samp.onCreateGangZone(zoneId, squareStart, squareEnd, color) -- zoneId = 'int16'}, {squareStart = 'vector2d'}, {squareEnd = 'vector2d'}, {color = 'int32'}
+    im_cfg.gang_zone[zoneId] = {}
+    im_cfg.gang_zone[zoneId] = {
+        squareStart = squareStart,
+        squareEnd = squareEnd,
+        color = color,
+    }
 end
 
-function isCanRadarRender()
-    local res = isSampAvailable() and not isGamePaused() and isSampLoaded()
-    return res
+function samp.onSetMapIcon(iconId, position, type, color, style) --{iconId = 'int8'}, {position = 'vector3d'}, {type = 'int8'}, {color = 'int32'}, {style = 'int8'}}
+    local path = assetsPath .. tostring(type) .. '.png'
+    if doesFileExist(path) then
+        im_cfg.map_icons[iconId] = {}
+        im_cfg.map_icons[iconId] = {
+            position = position,
+            type = type,
+            color = color,
+            style = style,
+            texture = im.CreateTextureFromFile(path),
+        }
+    end
+end
+
+function samp.onGangZoneDestroy(zoneId)
+    if im_cfg.gang_zone[zoneId] ~= nil then
+        im_cfg.gang_zone[zoneId] = nil
+    end
+end
+
+function samp.onRemoveMapIcon(iconId)
+    if im_cfg.map_icons[iconId] ~= nil then
+        im_cfg.map_icons[iconId] = nil
+    end
 end
